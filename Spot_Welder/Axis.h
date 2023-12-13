@@ -103,6 +103,12 @@ public:
   void eStop() {
     ESTOPPED = true;
     stepper.stop();
+    stepper.run();
+  }
+
+  // Reset emergency stop
+  void resetEStop() {
+    ESTOPPED = false;
   }
 
 protected:
@@ -134,6 +140,11 @@ public:
     stepper.move((inverted ^ backwards) ? -mStepover : mStepover);
   }
 
+  // Stepover by half the set distance
+  void stepoverHalf(bool backwards = false) {
+    stepper.move((inverted ^ backwards) ? -mStepover / 2 : mStepover / 2);
+  }
+
   // Stepover by a custom distance
   void stepoverCustom(float stepSize, bool backwards = false) {
     stepper.move((inverted ^ backwards) ? -stepSize : stepSize);
@@ -142,6 +153,15 @@ public:
   // Run a stepover, pausing other operations
   void stepoverBlocking(bool backwards = false) {
     stepover(backwards);
+    while (stepper.distanceToGo() != 0 && !ESTOPPED) {
+      stepper.run();
+    }
+    stepper.stop();
+  }
+
+  // Run a half stepover, pausing other operations
+  void stepoverHalfBlocking(bool backwards = false) {
+    stepoverHalf(backwards);
     while (stepper.distanceToGo() != 0 && !ESTOPPED) {
       stepper.run();
     }

@@ -2,33 +2,23 @@
 #include "Axis.h"
 
 const int eStopPin = 2;
-const int xStepPin = 3;
-const int yStepPin = 4;
-const int zStepPin = 5;
-const int xDirPin = 6;
+const int yStepPin = 5;
+const int zStepPin = 6;
 const int yDirPin = 7;
 const int zDirPin = 8;
-const int xEnablePin = 9;
 const int yEnablePin = 10;
 const int zEnablePin = 11;
-const int xHomePin = A0;
-const int yHomePin = A1;
-const int zHomePin = A2;
+const int yHomePin = A0;
+const int zHomePin = A1;
+
+#define WELD_TIME 500
 
 bool stopped = false;
 
-HorizontalAxis x(xStepPin, xDirPin, xEnablePin, false);
 HorizontalAxis y(yStepPin, yDirPin, yEnablePin, false);
 ZAxis z(zStepPin, zDirPin, zEnablePin, false);
 
 void setup() {
-  // Configure X Axis Settings
-  x.setMaxSpeed(1000);
-  x.setAcceleration(50000);
-  pinMode(xHomePin, INPUT_PULLUP);
-  x.attachHome(xHomePin);
-  x.setStepover(50);
-
   // Configure Y Axis Settings
   y.setMaxSpeed(1000);
   y.setAcceleration(50000);
@@ -55,11 +45,19 @@ void setup() {
 void runSeries(int passes = 1) {
   stopped = false;
   for (int i = 0; i < passes && !stopped; i++) {
-    z.stepdownCycle(1000);
+    Serial.print("running pass: ")
+    Serial.print(i);
+    Serial.print(" cell: ")
+    Serial.println(0);
+    z.stepdownCycle(WELD_TIME);
     for (int j = 0; j < 23 && !stopped; i++) {
+      Serial.print("running pass: ")
+      Serial.print(i);
+      Serial.print(" cell: ")
+      Serial.println(j + 1);
       y.stepoverBlocking();
       delay(100);
-      z.stepdownCycle(500);
+      z.stepdownCycle(WELD_TIME);
       delay(100);
       while (Serial.available()) {
         String cmd = Serial.readString();
@@ -116,7 +114,6 @@ void parseCommand(String cmd) {
     z.home();
   }
   else if (cmd == "homeAll") {
-    x.home();
     y.home();
     z.home();
   }
@@ -153,6 +150,16 @@ void parseCommand(String cmd) {
   }
   else if (cmd == "zStop") {
     z.stop();
+  }
+  else if (cmd == "eStop") {
+    y.eStop();
+    z.eStop();
+  }
+  else if (cmd == "yResetEStop") {
+    y.resetEStop();
+  }
+  else if (cmd == "zResetEStop") {
+    z.resetEStop();
   }
   else if (cmd == "yIsRunning") {
     Serial.println(y.isRunning());
