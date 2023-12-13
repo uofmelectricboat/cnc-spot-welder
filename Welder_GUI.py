@@ -57,7 +57,6 @@ class GUI(ctk.CTk):
         ########################################################################
         # Control frame
         self.controlFrame = ctk.CTkFrame(parent, fg_color="#08003A", width=100, height=75)
-        self.controlFrame.pack(side=tk.TOP, pady=20, padx=20, fill=tk.NONE, anchor=tk.NW)
         
         self.yLeftButton = ctk.CTkButton(self.controlFrame, text="<", command=self.yLeft, corner_radius=999, width=25, height=25)
         self.yRightButton = ctk.CTkButton(self.controlFrame, text=">", command=self.yRight, corner_radius=999, width=25, height=25)
@@ -125,6 +124,7 @@ class GUI(ctk.CTk):
 
     
     def enableControl(self):
+        self.controlFrame.pack(side=tk.TOP, pady=20, padx=20, fill=tk.NONE, anchor=tk.NW)
         self.yLeftButton.configure(state=tk.NORMAL)
         self.yRightButton.configure(state=tk.NORMAL)
         self.zUpButton.configure(state=tk.NORMAL)
@@ -134,6 +134,7 @@ class GUI(ctk.CTk):
         self.homeAllButton.configure(state=tk.NORMAL)
 
     def disableControl(self):
+        self.controlFrame.pack_forget()
         self.yLeftButton.configure(state=tk.DISABLED)
         self.yRightButton.configure(state=tk.DISABLED)
         self.zUpButton.configure(state=tk.DISABLED)
@@ -228,6 +229,8 @@ class GUI(ctk.CTk):
         global finished
         global paused
         global ser
+        if not tk.messagebox.askokcancel("Start Welding", "Are you sure you want to start welding?"):
+            return
         if paused:
             paused = False
             self.pauseButton.configure(state=tk.NORMAL)
@@ -243,7 +246,7 @@ class GUI(ctk.CTk):
         self.pauseButton.configure(state=tk.NORMAL)
         self.startButton.configure(state=tk.DISABLED)
         self.disableControl()
-        ser.write(b'runScript\n')
+        ser.write(b'runSeries\n')
 
     def stop(self):
         global finished
