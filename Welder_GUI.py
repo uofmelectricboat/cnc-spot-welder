@@ -22,9 +22,10 @@ class GUI(ctk.CTk):
         self.root.title("CNC Spot Welder GUI")
         self.root.configure(fg_color="#08003A")
 
+
         ########################################################################
         # Title frame at the top
-        self.titleFrame = ctk.CTkFrame(parent, fg_color="#08003A")
+        self.titleFrame = ctk.CTkFrame(self.root, fg_color="#08003A")
         self.titleFrame.pack(side=tk.TOP, fill=tk.X, pady=15)
 
         self.titleLeftSpacer = ctk.CTkFrame(self.titleFrame, fg_color="#08003A", width=30, height=50)
@@ -41,22 +42,41 @@ class GUI(ctk.CTk):
         self.titleText = ctk.CTkLabel(self.titleFrame, text="CNC Spot Welder GUI", font=("Berlin Sans FB", 36), anchor=tk.E)
         self.titleText.pack(side=tk.RIGHT, fill=tk.X, expand=True, anchor=tk.E)
 
+
         ########################################################################
         # Current status frame
         # When status changes, modify self.statusCurrent
-        self.statusFrame = ctk.CTkFrame(parent, fg_color="#08003A")
+        self.statusFrame = ctk.CTkFrame(self.root, fg_color="#08003A")
         self.statusFrame.pack(side=tk.TOP, fill=tk.X, pady=20, padx=30)
 
         self.statusText = ctk.CTkLabel(self.statusFrame, text="Current Status:", font=("Berlin Sans FB", 18))
         self.statusText.pack(side=tk.LEFT, fill=tk.X, padx=10)
         self.statusCurrent = ctk.CTkLabel(self.statusFrame, text="Idle", text_color="yellow", font=("Berlin Sans FB", 18))
         self.statusCurrent.pack(side=tk.LEFT)
-        self.startButton = ctk.CTkButton(self.statusFrame, text="Begin Welding", text_color="#08003A", command=self.start, state=tk.DISABLED, corner_radius=999, height=35, width=120)
-        self.startButton.pack(side=tk.RIGHT, padx=20)
+
+
+        ########################################################################
+        # Buttons frame
+        self.buttonsFrame = ctk.CTkFrame(self.statusFrame, fg_color="#08003A")
+        self.buttonsFrame.pack(side=tk.RIGHT, fill=tk.X, pady=10, padx=5)
+        
+        self.startButton = ctk.CTkButton(self.buttonsFrame, text="Begin Welding", text_color="#08003A", command=self.start, state=tk.DISABLED, corner_radius=999, height=35, width=120)
+        self.startButton.pack(side=tk.RIGHT, padx=50)
+
+        self.stopButton = ctk.CTkButton(self.buttonsFrame, text="Stop", text_color="#08003A", command=self.stop, state=tk.DISABLED, corner_radius=999, height=35, width=75)
+        self.pauseButton = ctk.CTkButton(self.buttonsFrame, text="Pause", text_color="#08003A", command=self.pause, state=tk.DISABLED, corner_radius=999, height=35, width=75)
+
+
+
+        ########################################################################
+        # Permanent body frame
+        self.bodyFrame = ctk.CTkFrame(self.root, fg_color="#08003A", height=10)
+        self.bodyFrame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
 
         ########################################################################
         # Control frame
-        self.controlFrame = ctk.CTkFrame(parent, fg_color="#08003A", width=100, height=75)
+        self.controlFrame = ctk.CTkFrame(self.bodyFrame, fg_color="#08003A", width=100, height=75)
         
         self.yLeftButton = ctk.CTkButton(self.controlFrame, text="<", command=self.yLeft, corner_radius=999, width=25, height=25)
         self.yRightButton = ctk.CTkButton(self.controlFrame, text=">", command=self.yRight, corner_radius=999, width=25, height=25)
@@ -93,14 +113,25 @@ class GUI(ctk.CTk):
 
 
         ########################################################################
-        # Active script frame
-        self.runnningFrame = ctk.CTkFrame(parent, fg_color="#08003A")
-        
-        self.stopButton = ctk.CTkButton(self.runnningFrame, text="Stop", command=self.stop)
-        self.pauseButton = ctk.CTkButton(self.runnningFrame, text="Pause", command=self.pause)
+        # Progress frame
+        self.progressFrame = ctk.CTkFrame(self.bodyFrame, fg_color="#08003A")
 
-        self.stopButton.pack(side=tk.LEFT)
-        self.pauseButton.pack(side=tk.LEFT)
+        self.progressText = ctk.CTkLabel(self.progressFrame, text="Progress:")
+        # self.progressRowLabel = ctk.CTkLabel(self.progressFrame, text="Current Row:")
+        # self.progressRow = ctk.CTkLabel(self.progressFrame, text="0")
+        self.progressPassLabel = ctk.CTkLabel(self.progressFrame, text="Current Pass:")
+        self.progressPass = ctk.CTkLabel(self.progressFrame, text="0")
+        self.progressCellLabel = ctk.CTkLabel(self.progressFrame, text="Current Cell:")
+        self.progressCell = ctk.CTkLabel(self.progressFrame, text="0")
+
+        self.progressText.grid(column=0, row=0, columnspan=2, padx=2, pady=2)
+        # self.progressRowLabel.grid(column=0, row=1, padx=2, pady=2)
+        # self.progressRow.grid(column=1, row=1, padx=2, pady=2)
+        self.progressPassLabel.grid(column=0, row=2, padx=2, pady=2)
+        self.progressPass.grid(column=1, row=2, padx=2, pady=2)
+        self.progressCellLabel.grid(column=0, row=3, padx=2, pady=2)
+        self.progressCell.grid(column=1, row=3, padx=2, pady=2)
+
 
         ########################################################################
         # Connection frame at the bottom
@@ -231,20 +262,16 @@ class GUI(ctk.CTk):
         global ser
         if not tk.messagebox.askokcancel("Start Welding", "Are you sure you want to start welding?"):
             return
-        if paused:
-            paused = False
-            self.pauseButton.configure(state=tk.NORMAL)
-            self.startButton.configure(state=tk.DISABLED)
-            self.stopButton.configure(state=tk.NORMAL)
-            self.disableControl()
-            ser.write(b'continue\n')
-            return
         if not finished:
             return
         finished = False
         self.stopButton.configure(state=tk.NORMAL)
+        self.stopButton.pack(side=tk.RIGHT, padx=10)
         self.pauseButton.configure(state=tk.NORMAL)
+        self.pauseButton.pack(side=tk.RIGHT, padx=10)
         self.startButton.configure(state=tk.DISABLED)
+        self.startButton.pack_forget()
+        self.progressFrame.pack(side=tk.RIGHT, fill=tk.X, padx=30, pady=10, anchor=tk.N)
         self.disableControl()
         ser.write(b'runSeries\n')
 
@@ -255,19 +282,29 @@ class GUI(ctk.CTk):
         finished = True
         paused = False
         self.stopButton.configure(state=tk.DISABLED)
+        self.stopButton.pack_forget()
         self.pauseButton.configure(state=tk.DISABLED)
+        self.pauseButton.pack_forget()
         self.startButton.configure(state=tk.NORMAL)
+        self.startButton.pack(side=tk.RIGHT, padx=10)
+        self.progressFrame.pack_forget()
         self.enableControl()
         ser.write(b'stop\n')
 
     def pause(self):
         global paused
         global ser
+        if paused:
+            if not tk.messagebox.askokcancel("Continue Welding", "Are you sure you want to resume welding?"):
+                return
+            paused = False
+            self.pauseButton.configure(text="Pause")
+            self.disableControl()
+            ser.write(b'continue\n')
+            return
         paused = True
-        self.pauseButton.configure(state=tk.DISABLED)
-        self.startButton.configure(state=tk.NORMAL)
+        self.pauseButton.configure(text="Resume")
         self.enableControl()
-        self.stopButton.configure(state=tk.NORMAL)
         ser.write(b'pause\n')
     
     def lostConnection(self):
@@ -277,11 +314,17 @@ class GUI(ctk.CTk):
         self.stopButton.configure(state=tk.DISABLED)
         self.statusCurrent.configure(text="Lost Connection", text_color="red")
         tk.messagebox.showerror("Connection Error", "Connection lost")
-        
 
-def finish(self):
-    global finished
-    finished = True
+    def finish(self):
+        global finished
+        finished = True
+        self.stopButton.configure(state=tk.DISABLED)
+        self.stopButton.pack_forget()
+        self.pauseButton.configure(state=tk.DISABLED)
+        self.pauseButton.pack_forget()
+        self.startButton.configure(state=tk.NORMAL)
+        self.startButton.pack(side=tk.RIGHT, padx=10)
+        self.progressFrame.pack_forget()
     
 root = ctk.CTk()
 app = GUI(root)
@@ -303,7 +346,20 @@ def checkFinish():
         if (ser.in_waiting > 0):
             line = ser.readline()
             if (line == b'finished\n' or b'finished\r\n'):
-                finish()
+                app.finish()
+            elif (line[0] == b'R'):
+                app.statusCurrent.configure(text="Running", text_color="green")
+                state = line[1:0].split(b' ')
+                # app.progressRow.configure(text=state[0])
+                app.progressPass.configure(text=state[0])
+                app.progressCell.configure(text=state[1])
+            elif (line == b'paused\n'):
+                app.statusCurrent.configure(text="Paused", text_color="orange")
+            elif (line == b'ESTOP\n'):
+                app.statusCurrent.configure(text="Emergency Stop", text_color="red")
+                tk.messagebox.showerror("Emergency Stop", "Emergency Stop Activated")
+            elif (line == b'idle\n'):
+                app.statusCurrent.configure(text="Idle", text_color="yellow")
 
 finishThread = threading.Thread(target=checkFinish)
 

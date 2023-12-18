@@ -14,9 +14,17 @@ const int zHomePin = A1;
 #define WELD_TIME 500
 
 bool stopped = false;
+unsigned long lastPrint = 0;
 
 HorizontalAxis y(yStepPin, yDirPin, yEnablePin, false);
 ZAxis z(zStepPin, zDirPin, zEnablePin, false);
+
+void eStop() {
+  y.eStop();
+  z.eStop();
+  stopped = true;
+  Serial.println("ESTOP");
+}
 
 void setup() {
   // Configure Y Axis Settings
@@ -34,9 +42,7 @@ void setup() {
   z.setStepdown(20);
 
   pinMode(eStopPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(eStopPin), []() {
-    y.eStop(); z.eStop(); stopped = true;
-  }, FALLING);
+  attachInterrupt(digitalPinToInterrupt(eStopPin), eStop, FALLING);
 
   Serial.begin(9600);
 }
@@ -45,16 +51,16 @@ void setup() {
 void runSeries(int passes = 1) {
   stopped = false;
   for (int i = 0; i < passes && !stopped; i++) {
-    Serial.print("running pass: ")
-    Serial.print(i);
-    Serial.print(" cell: ")
-    Serial.println(0);
+    Serial.print("R")
+    Serial.print(i); // Pass count
+    Serial.print(" ")
+    Serial.println(0); // Cell count
     z.stepdownCycle(WELD_TIME);
     for (int j = 0; j < 23 && !stopped; i++) {
-      Serial.print("running pass: ")
-      Serial.print(i);
-      Serial.print(" cell: ")
-      Serial.println(j + 1);
+      Serial.print("R")
+      Serial.print(i); // Pass count
+      Serial.print(" ")
+      Serial.println(j + 1); // Cell count
       y.stepoverBlocking();
       delay(100);
       z.stepdownCycle(WELD_TIME);
@@ -67,6 +73,7 @@ void runSeries(int passes = 1) {
         }
         while (cmd == "pause") {
           while (!Serial.available()) {
+            Serial.println("paused");
             delay(100);
           }
           cmd = Serial.readString();
@@ -213,4 +220,8 @@ void loop() {
   }
   y.run();
   z.run();
+  if (millis() > lastPrint + 100) {
+    Serial.println("idle")
+    lastPrint = millis();
+  }
 }
