@@ -216,7 +216,7 @@ class GUI(ctk.CTk):
         ser.write(f'zMove -{self.zStepSizeVal}\n'.encode('utf-8'))
 
     def refreshConnections(self):
-        self.connectTarget['values'] = [port.name for port in serial.tools.list_ports.comports()]
+        self.connectTarget.configure(values = [port.name for port in serial.tools.list_ports.comports()])
 
     def connect(self):
         global ser
@@ -386,6 +386,7 @@ def checkFinish():
                     # print('yippeee')
         except serial.SerialException:
             app.lostConnection()
+            wasOpen = False
             ser.close()
 
 finishThread = threading.Thread(target=checkFinish)
