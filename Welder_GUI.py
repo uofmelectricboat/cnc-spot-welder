@@ -9,7 +9,6 @@ finished = True
 paused = False
 
 ser = serial.Serial(baudrate=9600)
-ser.port = 'COM5'
 
 ########################################################################
 class GUI(ctk.CTk):
@@ -17,7 +16,7 @@ class GUI(ctk.CTk):
         ########################################################################
         # Initialize the root window
         self.root = parent
-        self.root.geometry("500x400")
+        self.root.geometry("500x450")
         
         self.root.title("CNC Spot Welder GUI")
         self.root.configure(fg_color="#08003A")
@@ -51,7 +50,7 @@ class GUI(ctk.CTk):
 
         self.statusText = ctk.CTkLabel(self.statusFrame, text="Current Status:", font=("Berlin Sans FB", 18))
         self.statusText.pack(side=tk.LEFT, fill=tk.X, padx=10)
-        self.statusCurrent = ctk.CTkLabel(self.statusFrame, text="Idle", text_color="yellow", font=("Berlin Sans FB", 18))
+        self.statusCurrent = ctk.CTkLabel(self.statusFrame, text="Disconnected", text_color="orange", font=("Berlin Sans FB", 18))
         self.statusCurrent.pack(side=tk.LEFT)
 
 
@@ -61,7 +60,7 @@ class GUI(ctk.CTk):
         self.buttonsFrame.pack(side=tk.RIGHT, fill=tk.X, pady=10, padx=5)
         
         self.startButton = ctk.CTkButton(self.buttonsFrame, text="Begin Welding", text_color="#08003A", command=self.start, state=tk.DISABLED, corner_radius=999, height=35, width=120)
-        self.startButton.pack(side=tk.RIGHT, padx=50)
+        self.startButton.pack(side=tk.RIGHT, padx=35)
 
         self.stopButton = ctk.CTkButton(self.buttonsFrame, text="Stop", text_color="#08003A", command=self.stop, state=tk.DISABLED, corner_radius=999, height=35, width=75)
         self.pauseButton = ctk.CTkButton(self.buttonsFrame, text="Pause", text_color="#08003A", command=self.pause, state=tk.DISABLED, corner_radius=999, height=35, width=75)
@@ -156,6 +155,7 @@ class GUI(ctk.CTk):
     
     def enableControl(self):
         self.controlFrame.pack(side=tk.TOP, pady=20, padx=20, fill=tk.NONE, anchor=tk.NW)
+        self.startButton.configure(state=tk.NORMAL)
         self.yLeftButton.configure(state=tk.NORMAL)
         self.yRightButton.configure(state=tk.NORMAL)
         self.zUpButton.configure(state=tk.NORMAL)
@@ -166,6 +166,7 @@ class GUI(ctk.CTk):
 
     def disableControl(self):
         self.controlFrame.pack_forget()
+        self.startButton.configure(state=tk.DISABLED)
         self.yLeftButton.configure(state=tk.DISABLED)
         self.yRightButton.configure(state=tk.DISABLED)
         self.zUpButton.configure(state=tk.DISABLED)
@@ -219,20 +220,27 @@ class GUI(ctk.CTk):
 
     def connect(self):
         global ser
-        ser = serial.Serial(baudrate=9600)
-        ser.port = self.connectTargText.get()
+        global safeDisconnect
         if (ser.is_open):
+            safeDisconnect = True
             ser.close()
+            self.connectionButton.configure(text="Connect", fg_color="green")
+            self.statusCurrent.configure(text="Disconnected", text_color="orange")
+            self.disableControl()
+            return
+        safeDisconnect = False
+        ser.port = self.connectTargText.get()
         if (ser.port == ""):
             tk.messagebox.showerror("Connection Error", "No port selected")
-            return;
+            return
         try:
             ser.open()
         except serial.SerialException:
             print("Could not open port")
             tk.messagebox.showerror("Connection Error", "Could not open port")
-            return;
-        print(ser.is_open)
+            return
+        # print(ser.is_open)
+        self.connectionButton.configure(text="Disconnect", fg_color="red")
         self.enableControl()
 
     def homeY(self):
@@ -240,14 +248,14 @@ class GUI(ctk.CTk):
         global ser
         if not finished:
             return
-        ser.write(b'homeY\n')
+        ser.write(b'yHome\n')
 
     def homeZ(self):
         global finished
         global ser
         if not finished:
             return
-        ser.write(b'homeZ\n')
+        ser.write(b'zHome\n')
 
     def homeAll(self):
         global finished
@@ -312,6 +320,7 @@ class GUI(ctk.CTk):
         self.startButton.configure(state=tk.DISABLED)
         self.pauseButton.configure(state=tk.DISABLED)
         self.stopButton.configure(state=tk.DISABLED)
+        self.connectionButton.configure(text="Connect", fg_color="green")
         self.statusCurrent.configure(text="Lost Connection", text_color="red")
         tk.messagebox.showerror("Connection Error", "Connection lost")
 
@@ -331,35 +340,53 @@ app = GUI(root)
 
 end = False
 wasOpen = False
+safeDisconnect = False
 
 def checkFinish():
     global end
     global wasOpen
+    global safeDisconnect
     while not end:
         time.sleep(0.1)
-        if not ser.is_open:
-            if wasOpen:
-                app.lostConnection()
-                wasOpen = False
-            continue
-        wasOpen = True
-        if (ser.in_waiting > 0):
-            line = ser.readline()
-            if (line == b'finished\n' or b'finished\r\n'):
-                app.finish()
-            elif (line[0] == b'R'):
-                app.statusCurrent.configure(text="Running", text_color="green")
-                state = line[1:0].split(b' ')
-                # app.progressRow.configure(text=state[0])
-                app.progressPass.configure(text=state[0])
-                app.progressCell.configure(text=state[1])
-            elif (line == b'paused\n'):
-                app.statusCurrent.configure(text="Paused", text_color="orange")
-            elif (line == b'ESTOP\n'):
-                app.statusCurrent.configure(text="Emergency Stop", text_color="red")
-                tk.messagebox.showerror("Emergency Stop", "Emergency Stop Activated")
-            elif (line == b'idle\n'):
-                app.statusCurrent.configure(text="Idle", text_color="yellow")
+        try:
+            if not ser.is_open:
+                if wasOpen:
+                    if not safeDisconnect:
+                        app.lostConnection()
+                    wasOpen = False
+                continue
+            wasOpen = True
+            if (ser.in_waiting > 0):
+                line = ser.readline()
+                line = line.decode('ascii')
+                if (line[-2:] == '\r\n'):
+                    line = line[:-2]
+                elif (line[-1] == '\n'):
+                    line = line[:-1]
+                print(line)
+                if (line == 'finished'):
+                    print("done")
+                    app.finish()
+                elif (line[0] == 'R'):
+                    app.statusCurrent.configure(text="Running", text_color="green")
+                    state = line[1:].split(' ')
+                    print(state)
+                    if (state.__len__() < 2):
+                        continue
+                    # app.progressRow.configure(text=state[0])
+                    app.progressPass.configure(text=state[0])
+                    app.progressCell.configure(text=state[1])
+                elif (line == 'paused'):
+                    app.statusCurrent.configure(text="Paused", text_color="orange")
+                elif (line == 'ESTOP'):
+                    app.statusCurrent.configure(text="Emergency Stop", text_color="red")
+                    tk.messagebox.showerror("Emergency Stop", "Emergency Stop Activated")
+                elif (line == 'idle'):
+                    app.statusCurrent.configure(text="Idle", text_color="yellow")
+                    # print('yippeee')
+        except serial.SerialException:
+            app.lostConnection()
+            ser.close()
 
 finishThread = threading.Thread(target=checkFinish)
 

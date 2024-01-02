@@ -51,15 +51,15 @@ void setup() {
 void runSeries(int passes = 1) {
   stopped = false;
   for (int i = 0; i < passes && !stopped; i++) {
-    Serial.print("R")
+    Serial.print("R");
     Serial.print(i); // Pass count
-    Serial.print(" ")
+    Serial.print(" ");
     Serial.println(0); // Cell count
     z.stepdownCycle(WELD_TIME);
-    for (int j = 0; j < 23 && !stopped; i++) {
-      Serial.print("R")
+    for (int j = 0; j < 23 && !stopped; j++) {
+      Serial.print("R");
       Serial.print(i); // Pass count
-      Serial.print(" ")
+      Serial.print(" ");
       Serial.println(j + 1); // Cell count
       y.stepoverBlocking();
       delay(100);
@@ -67,6 +67,7 @@ void runSeries(int passes = 1) {
       delay(100);
       while (Serial.available()) {
         String cmd = Serial.readString();
+        cmd.trim();
         if (cmd == "stop") {
           stopped = true;
           break;
@@ -77,6 +78,7 @@ void runSeries(int passes = 1) {
             delay(100);
           }
           cmd = Serial.readString();
+          cmd.trim();
           if (cmd == "stop") {
             stopped = true;
             break;
@@ -220,8 +222,8 @@ void loop() {
   }
   y.run();
   z.run();
-  if (millis() > lastPrint + 100) {
-    Serial.println("idle")
+  if (millis() > lastPrint + 1000) {
+    Serial.println("idle");
     lastPrint = millis();
   }
 }
