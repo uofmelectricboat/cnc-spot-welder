@@ -16,8 +16,8 @@ const int zHomePin = A1;
 bool stopped = false;
 unsigned long lastPrint = 0;
 
-HorizontalAxis y(yStepPin, yDirPin, yEnablePin, false);
-ZAxis z(zStepPin, zDirPin, zEnablePin, false);
+HorizontalAxis y(yEnablePin, yDirPin, yStepPin, true);
+ZAxis z(zEnablePin, zDirPin, zStepPin, true);
 
 void eStop() {
   y.eStop();
@@ -29,17 +29,17 @@ void eStop() {
 void setup() {
   // Configure Y Axis Settings
   y.setMaxSpeed(1000);
-  y.setAcceleration(50000);
+  y.setAcceleration(5000);
   pinMode(yHomePin, INPUT_PULLUP);
   y.attachHome(yHomePin);
-  y.setStepover(50);
+  y.setStepover(1000);
 
   // Configure Z Axis Settings
   z.setMaxSpeed(1000);
-  z.setAcceleration(50000);
+  z.setAcceleration(5000);
   pinMode(zHomePin, INPUT_PULLUP);
   z.attachHome(zHomePin);
-  z.setStepdown(20);
+  z.setStepdown(500);
 
   pinMode(eStopPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(eStopPin), eStop, FALLING);
@@ -87,21 +87,23 @@ void runSeries(int passes = 1) {
       }
     }
     y.stepoverBlockingCustom(10);
+    y.stepoverBlockingCustom(y.getStepover() * 23, true);
     delay(1000);
   }
   Serial.println("finished");
 }
 
-void parseCommand(String cmd) {
+void parseCommand(String cmd, String cmd2 = "") {
   if (cmd == "runSeries") {
+    Serial.println("# runSeries");
     runSeries(2);
   }
   else if (cmd == "ySetStepSize") {
-    float stepover = Serial.parseFloat();
+    float stepover = cmd2.toFloat();
     y.setStepover(stepover);
   }
   else if (cmd == "zSetStepSize") {
-    float stepdown = Serial.parseFloat();
+    float stepdown = cmd2.toFloat();
     z.setStepdown(stepdown);
   }
   else if (cmd == "yStepover") {
@@ -127,29 +129,33 @@ void parseCommand(String cmd) {
     z.home();
   }
   else if (cmd == "yMove") {
-    float distance = Serial.parseFloat();
+    float distance = cmd2.toFloat();
+    Serial.print("# yMove ");
+    Serial.println(distance);
     y.move(distance);
   }
   else if (cmd == "zMove") {
-    float distance = Serial.parseFloat();
+    float distance = cmd2.toFloat();
+    Serial.print("# zMove ");
+    Serial.println(distance);
     z.move(distance);
   }
   else if (cmd == "yMoveTo") {
-    float position = Serial.parseFloat();
+    float position = cmd2.toFloat();
     y.moveTo(position);
   }
   else if (cmd == "zMoveTo") {
-    float position = Serial.parseFloat();
+    float position = cmd2.toFloat();
     z.moveTo(position);
   }
   else if (cmd == "yRunMs") {
-    float targTime = millis() + Serial.parseFloat();
+    float targTime = millis() + cmd2.toFloat();
     while (millis() < targTime) {
       y.run();
     }
   }
   else if (cmd == "zRunMs") {
-    float targTime = millis() + Serial.parseFloat();
+    float targTime = millis() + cmd2.toFloat();
     while (millis() < targTime) {
       z.run();
     }
@@ -164,10 +170,8 @@ void parseCommand(String cmd) {
     y.eStop();
     z.eStop();
   }
-  else if (cmd == "yResetEStop") {
+  else if (cmd == "resetEStop") {
     y.resetEStop();
-  }
-  else if (cmd == "zResetEStop") {
     z.resetEStop();
   }
   else if (cmd == "yIsRunning") {
@@ -195,22 +199,22 @@ void parseCommand(String cmd) {
     Serial.println(z.getDistanceToGo());
   }
   else if (cmd == "ySetMaxSpeed") {
-    float speed = Serial.parseFloat();
+    float speed = cmd2.toFloat();
     y.setMaxSpeed(speed);
   }
   else if (cmd == "ySetMaxSpeed") {
-    float speed = Serial.parseFloat();
+    float speed = cmd2.toFloat();
     y.setMaxSpeed(speed);
   }
   else if (cmd == "zSetMaxSpeed") {
-    float speed = Serial.parseFloat();
+    float speed = cmd2.toFloat();
     z.setMaxSpeed(speed);
   }
   else if (cmd == "ping") {
     Serial.println("pong");
   }
   else {
-    Serial.println("Unknown command");
+    Serial.println("Unknown command " + cmd + ".");
   }
 }
 
@@ -218,12 +222,20 @@ void loop() {
   if (Serial.available()) {
     String cmd = Serial.readString();
     cmd.trim();
-    parseCommand(cmd);
+    String cmd2;
+    if (cmd.indexOf(" ") != -1) {
+      cmd2 = cmd.substring(cmd.indexOf(" ") + 1);
+      cmd = cmd.substring(0, cmd.indexOf(" "));
+    }
+    parseCommand(cmd, cmd2);
   }
   y.run();
   z.run();
   if (millis() > lastPrint + 1000) {
-    Serial.println("idle");
+    if (y.getDistanceToGo() == 0 && z.getDistanceToGo() == 0)
+      Serial.println("idle");
+    else
+      Serial.println("moving");
     lastPrint = millis();
   }
 }

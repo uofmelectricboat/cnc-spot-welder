@@ -177,40 +177,52 @@ class GUI(ctk.CTk):
     
     def yLeft(self, args=0):
         global ser
-        if not ser.is_open or not self.yLeftButton['state'] == tk.NORMAL:
+        if not ser.is_open or not self.yLeftButton.cget('state') == tk.NORMAL:
             return
         if (self.yStepSize.get() == ""):
             tk.messagebox.showerror("Error", "No step size selected")
+            return
+        elif (not self.yStepSize.get().isdigit()):
+            tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.yStepSizeVal = self.yStepSize.get()
         ser.write(f'yMove {self.yStepSizeVal}\n'.encode('utf-8'))
 
     def yRight(self, args=0):
         global ser
-        if not ser.is_open or not self.yRightButton['state'] == tk.NORMAL:
+        if not ser.is_open or not self.yRightButton.cget('state') == tk.NORMAL:
             return
         if (self.yStepSize.get() == ""):
             tk.messagebox.showerror("Error", "No step size selected")
+            return
+        elif (not self.yStepSize.get().isdigit()):
+            tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.yStepSizeVal = self.yStepSize.get()
         ser.write(f'yMove -{self.yStepSizeVal}\n'.encode('utf-8'))
 
     def zUp(self, args=0):
         global ser
-        if not ser.is_open or not self.zUpButton['state'] == tk.NORMAL:
+        if not ser.is_open or not self.zUpButton.cget('state') == tk.NORMAL:
             return
         if (self.zStepSize.get() == ""):
             tk.messagebox.showerror("Error", "No step size selected")
+            return
+        elif (not self.zStepSize.get().isdigit()):
+            tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.zStepSizeVal = self.zStepSize.get()
         ser.write(f'zMove {self.zStepSizeVal}\n'.encode('utf-8'))
 
     def zDown(self, args=0):
         global ser
-        if not ser.is_open or not self.zDownButton['state'] == tk.NORMAL:
+        if not ser.is_open or not self.zDownButton.cget('state') == tk.NORMAL:
             return
         if (self.zStepSize.get() == ""):
             tk.messagebox.showerror("Error", "No step size selected")
+            return
+        elif (not self.zStepSize.get().isdigit()):
+            tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.zStepSizeVal = self.zStepSize.get()
         ser.write(f'zMove -{self.zStepSizeVal}\n'.encode('utf-8'))
@@ -356,7 +368,7 @@ def checkFinish():
                     wasOpen = False
                 continue
             wasOpen = True
-            if (ser.in_waiting > 0):
+            while (ser.in_waiting > 0):
                 line = ser.readline()
                 line = line.decode('ascii')
                 if (line[-2:] == '\r\n'):
@@ -364,7 +376,11 @@ def checkFinish():
                 elif (line[-1] == '\n'):
                     line = line[:-1]
                 print(line)
-                if (line == 'finished'):
+                if (line == ''):
+                    continue
+                elif (line[0] == '#'):
+                    continue
+                elif (line == 'finished'):
                     print("done")
                     app.finish()
                 elif (line[0] == 'R'):
@@ -383,6 +399,8 @@ def checkFinish():
                     tk.messagebox.showerror("Emergency Stop", "Emergency Stop Activated")
                 elif (line == 'idle'):
                     app.statusCurrent.configure(text="Idle", text_color="yellow")
+                elif (line == 'moving'):
+                    app.statusCurrent.configure(text="Moving", text_color="green")
                     # print('yippeee')
         except serial.SerialException:
             app.lostConnection()

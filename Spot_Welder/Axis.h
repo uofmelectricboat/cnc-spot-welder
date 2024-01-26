@@ -82,7 +82,7 @@ public:
   }
 
   // Home the current axis. Returns immediately if no home is set.
-  void home(float homeSpeed = 100) {
+  void home(float homeSpeed = 500) {
     if (mHomePin == -1) {
       stepper.setCurrentPosition(0);
       return;
@@ -91,6 +91,13 @@ public:
     while (digitalRead(mHomePin) == HIGH && !ESTOPPED) {
       stepper.runSpeed();
     }
+    stepper.stop();
+    delay(50);
+    move(100);
+    while (getDistanceToGo() != 0 && !ESTOPPED) {
+      stepper.run();
+    }
+    stepper.stop();
     stepper.setCurrentPosition(0);
   }
 
@@ -154,7 +161,7 @@ public:
   void stepoverBlocking(bool backwards = false) {
     stepover(backwards);
     while (stepper.distanceToGo() != 0 && !ESTOPPED) {
-      stepper.run();
+      run();
     }
     stepper.stop();
   }
@@ -163,7 +170,7 @@ public:
   void stepoverHalfBlocking(bool backwards = false) {
     stepoverHalf(backwards);
     while (stepper.distanceToGo() != 0 && !ESTOPPED) {
-      stepper.run();
+      run();
     }
     stepper.stop();
   }
@@ -172,7 +179,7 @@ public:
   void stepoverBlockingCustom(float stepSize, bool backwards = false) {
     stepoverCustom(stepSize, backwards);
     while (stepper.distanceToGo() != 0 && !ESTOPPED) {
-      stepper.run();
+      run();
     }
     stepper.stop();
   }
@@ -186,6 +193,7 @@ private:
 class ZAxis : public Axis {
 public:
   // Constructor
+  // Note: defaults to inverted
   ZAxis(int EN, int DIR, int STEP, bool invertedIn = false): Axis(EN, DIR, STEP, invertedIn) {}
   
   // Set the stepdown distance
@@ -223,15 +231,15 @@ public:
   void stepdownCycle(int pause) {
     stepdown();
     while (stepper.distanceToGo() != 0 && !ESTOPPED) {
-      stepper.run();
+      run();
     }
-    stepper.stop();
+    stop();
     delay(pause);
     stepup();
     while (stepper.distanceToGo() != 0 && !ESTOPPED) {
-      stepper.run();
+      run();
     }
-    stepper.stop();
+    stop();
   }
 
 private:
