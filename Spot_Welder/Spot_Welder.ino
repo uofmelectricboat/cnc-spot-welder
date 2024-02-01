@@ -11,7 +11,7 @@ const int zEnablePin = 11;
 const int yHomePin = A0;
 const int zHomePin = A1;
 
-#define WELD_TIME 500
+#define WELD_TIME 200
 
 bool stopped = false;
 unsigned long lastPrint = 0;
@@ -27,24 +27,27 @@ void eStop() {
 }
 
 void setup() {
+  Serial.begin(9600);
+
   // Configure Y Axis Settings
   y.setMaxSpeed(1000);
   y.setAcceleration(5000);
   pinMode(yHomePin, INPUT_PULLUP);
   y.attachHome(yHomePin);
-  y.setStepover(1000);
+  y.setStepover(1016); // 1016 = 1 in
 
   // Configure Z Axis Settings
   z.setMaxSpeed(1000);
   z.setAcceleration(5000);
   pinMode(zHomePin, INPUT_PULLUP);
   z.attachHome(zHomePin);
-  z.setStepdown(500);
+  z.setStepdown(125); // 125 = 5mm
 
   pinMode(eStopPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(eStopPin), eStop, FALLING);
-
-  Serial.begin(9600);
+  delay(10);
+  y.resetEStop();
+  z.resetEStop();
 }
 
 // Run the script to weld a series of 24 cells
@@ -86,9 +89,82 @@ void runSeries(int passes = 1) {
         }
       }
     }
+    if (stopped)
+      break;
     y.stepoverBlockingCustom(10);
     y.stepoverBlockingCustom(y.getStepover() * 23, true);
     delay(1000);
+  }
+  Serial.println("finished");
+}
+
+
+// Run the script to weld a series of N 18650 cells
+void runSeries18650(int cells, int passes = 1) {
+  y.setStepover(889);
+  z.setStepdown(250);
+  stopped = false;
+  for (int i = 0; i < passes && !stopped; i++) {
+    Serial.print("R");
+    Serial.print(i); // Pass count
+    Serial.print(" ");
+    Serial.println(0); // Cell count
+    z.stepdownCycle(WELD_TIME);
+    for (int j = 0; j < cells && !stopped; j++) {
+      Serial.print("R");
+      Serial.print(i); // Pass count
+      Serial.print(" ");
+      Serial.println(j + 1); // Cell count
+      y.stepoverBlocking(true);
+      delay(100);
+      z.stepdownCycle(WELD_TIME);
+      delay(100);
+      while (Serial.available()) {
+        String cmd = Serial.readString();
+        cmd.trim();
+        if (cmd == "stop") {
+          stopped = true;
+          break;
+        }
+        while (cmd == "pause") {
+          while (!Serial.available()) {
+            Serial.println("paused");
+            delay(100);
+          }
+          cmd = Serial.readString();
+          cmd.trim();
+          if (cmd == "stop") {
+            stopped = true;
+            break;
+          }
+        }
+      }
+    }
+    if (stopped)
+      break;
+    y.stepoverBlockingCustom(10);
+    y.stepoverBlockingCustom(y.getStepover() * 6, true);
+    delay(1000);
+    while (Serial.available()) {
+      String cmd = Serial.readString();
+      cmd.trim();
+      if (cmd == "stop") {
+        stopped = true;
+        break;
+      }
+      while (cmd == "pause") {
+        while (!Serial.available()) {
+          Serial.println("paused");
+          delay(100);
+        }
+        cmd = Serial.readString();
+        cmd.trim();
+        if (cmd == "stop") {
+          stopped = true;
+          break;
+        }
+      }
+    }
   }
   Serial.println("finished");
 }
@@ -117,6 +193,9 @@ void parseCommand(String cmd, String cmd2 = "") {
   }
   else if (cmd == "zStepup") {
     z.stepup();
+  }
+  else if (cmd == "zStepCycle") {
+    z.stepdownCycle(300);
   }
   else if (cmd == "yHome") {
     y.home();

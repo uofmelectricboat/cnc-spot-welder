@@ -186,7 +186,7 @@ class GUI(ctk.CTk):
             tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.yStepSizeVal = self.yStepSize.get()
-        ser.write(f'yMove {self.yStepSizeVal}\n'.encode('utf-8'))
+        ser.write(f'yMove -{self.yStepSizeVal}\n'.encode('utf-8'))
 
     def yRight(self, args=0):
         global ser
@@ -199,7 +199,7 @@ class GUI(ctk.CTk):
             tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.yStepSizeVal = self.yStepSize.get()
-        ser.write(f'yMove -{self.yStepSizeVal}\n'.encode('utf-8'))
+        ser.write(f'yMove {self.yStepSizeVal}\n'.encode('utf-8'))
 
     def zUp(self, args=0):
         global ser
@@ -212,7 +212,7 @@ class GUI(ctk.CTk):
             tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.zStepSizeVal = self.zStepSize.get()
-        ser.write(f'zMove {self.zStepSizeVal}\n'.encode('utf-8'))
+        ser.write(f'zMove -{self.zStepSizeVal}\n'.encode('utf-8'))
 
     def zDown(self, args=0):
         global ser
@@ -225,7 +225,7 @@ class GUI(ctk.CTk):
             tk.messagebox.showerror("Error", "Step size must be a whole number")
             return
         self.zStepSizeVal = self.zStepSize.get()
-        ser.write(f'zMove -{self.zStepSizeVal}\n'.encode('utf-8'))
+        ser.write(f'zMove {self.zStepSizeVal}\n'.encode('utf-8'))
 
     def refreshConnections(self):
         self.connectTarget.configure(values = [port.name for port in serial.tools.list_ports.comports()])

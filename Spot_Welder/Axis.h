@@ -7,7 +7,7 @@
 class Axis {
 public:
   // Constructor takes in EN, DIR, and STEP pins, as well as whether the stepper is inverted
-  Axis(int EN, int DIR, int STEP, bool invertedIn = false): stepper(AccelStepper::DRIVER, STEP, DIR), mHomePin(-1), inverted(invertedIn) {
+  Axis(int EN, int DIR, int STEP, bool invertedIn = false): stepper(AccelStepper::DRIVER, STEP, DIR), mHomePin(-1), inverted(invertedIn), ESTOPPED(false) {
     stepper.setEnablePin(EN);
   };
 
@@ -73,6 +73,10 @@ public:
 
   // Run the stepper according to active program. Will not process past home.
   void run() {
+    if (ESTOPPED) {
+      stop();
+      return;
+    }
     if (mHomePin != -1) {
       if (digitalRead(mHomePin) == LOW) {
         stepper.stop();
@@ -83,14 +87,20 @@ public:
 
   // Home the current axis. Returns immediately if no home is set.
   void home(float homeSpeed = 500) {
+    delay(5);
     if (mHomePin == -1) {
       stepper.setCurrentPosition(0);
       return;
     }
+    delay(5);
+    Serial.println("# Homing");
     stepper.setSpeed(inverted ? homeSpeed : -homeSpeed);
+    Serial.println(ESTOPPED);
     while (digitalRead(mHomePin) == HIGH && !ESTOPPED) {
       stepper.runSpeed();
+      delay(5);
     }
+    Serial.println(ESTOPPED);
     stepper.stop();
     delay(50);
     move(100);
@@ -108,6 +118,7 @@ public:
 
   // Emergency stop
   void eStop() {
+    Serial.println("# EMERGENCY STOP");
     ESTOPPED = true;
     stepper.stop();
     stepper.run();
@@ -121,7 +132,7 @@ public:
 protected:
   AccelStepper stepper;
   bool inverted;
-  bool ESTOPPED = false;
+  bool ESTOPPED;
   int mHomePin;
 };
 
