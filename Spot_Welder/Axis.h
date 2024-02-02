@@ -111,11 +111,6 @@ public:
     stepper.setCurrentPosition(0);
   }
 
-  // Check status of stepper
-  bool isActive() {
-    return stepper.isRunning();
-  }
-
   // Emergency stop
   void eStop() {
     Serial.println("# EMERGENCY STOP");

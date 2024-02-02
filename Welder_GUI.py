@@ -76,6 +76,9 @@ class GUI(ctk.CTk):
         ########################################################################
         # Control frame
         self.controlFrame = ctk.CTkFrame(self.bodyFrame, fg_color="#08003A", width=100, height=75)
+
+        self.root.bind("w", self.xForwards)
+        self.root.bind("s", self.xBackwards)
         
         self.yLeftButton = ctk.CTkButton(self.controlFrame, text="<", command=self.yLeft, corner_radius=999, width=25, height=25)
         self.yRightButton = ctk.CTkButton(self.controlFrame, text=">", command=self.yRight, corner_radius=999, width=25, height=25)
@@ -84,8 +87,8 @@ class GUI(ctk.CTk):
         self.yRightButton.grid(column=1, row=0, rowspan=3, padx=2, pady=2)
         self.yStepSize = ctk.CTkEntry(self.controlFrame, placeholder_text="Y Step", width=60)
         self.yStepSize.grid(column=0, columnspan=2, row=3, pady=10, padx=2)
-        self.root.bind("<Left>", self.yLeft)
-        self.root.bind("<Right>", self.yRight)
+        self.root.bind("a", self.yLeft)
+        self.root.bind("d", self.yRight)
 
         self.placeholder1 = ctk.CTkFrame(self.controlFrame, fg_color="#08003A", width=10, height=50)
         self.placeholder1.grid(column=2, row=0, rowspan=3, padx=2, pady=2)
@@ -97,8 +100,9 @@ class GUI(ctk.CTk):
         self.zDownButton.grid(column=3, row=2, padx=2, pady=2)
         self.zStepSize = ctk.CTkEntry(self.controlFrame, placeholder_text="Z Step", width=60)
         self.zStepSize.grid(column=3, row=3, pady=10, padx=2)
-        self.root.bind("<Up>", self.zUp)
-        self.root.bind("<Down>", self.zDown)
+        self.root.bind("<space>", self.zWeld)
+        self.root.bind("r", self.zUp)
+        self.root.bind("f", self.zDown)
 
         self.placeholder2 = ctk.CTkFrame(self.controlFrame, fg_color="#08003A", width=10, height=50)
         self.placeholder2.grid(column=4, row=0, rowspan=3, padx=2, pady=2)
@@ -151,7 +155,10 @@ class GUI(ctk.CTk):
         self.startButton.configure(state=tk.DISABLED)
         self.pauseButton.configure(state=tk.DISABLED)
         self.stopButton.configure(state=tk.DISABLED)
-
+        root.bind_all('<Button>', self.change_focus)
+    
+    def change_focus(self, event):
+        event.widget.focus_set()
     
     def enableControl(self):
         self.controlFrame.pack(side=tk.TOP, pady=20, padx=20, fill=tk.NONE, anchor=tk.NW)
@@ -174,6 +181,32 @@ class GUI(ctk.CTk):
         self.homeYButton.configure(state=tk.DISABLED)
         self.homeZButton.configure(state=tk.DISABLED)
         self.homeAllButton.configure(state=tk.DISABLED)
+
+    def xForwards(self, args=0):
+        global ser
+        if not ser.is_open or not self.yRightButton.cget('state') == tk.NORMAL:
+            return
+        if (self.yStepSize.get() == ""):
+            tk.messagebox.showerror("Error", "No step size selected")
+            return
+        elif (not self.yStepSize.get().isdigit()):
+            tk.messagebox.showerror("Error", "Step size must be a whole number")
+            return
+        self.yStepSizeVal = self.yStepSize.get()
+        ser.write(f'xMove -{self.yStepSizeVal}\n'.encode('utf-8'))
+    
+    def xBackwards(self, args=0):
+        global ser
+        if not ser.is_open or not self.yLeftButton.cget('state') == tk.NORMAL:
+            return
+        if (self.yStepSize.get() == ""):
+            tk.messagebox.showerror("Error", "No step size selected")
+            return
+        elif (not self.yStepSize.get().isdigit()):
+            tk.messagebox.showerror("Error", "Step size must be a whole number")
+            return
+        self.yStepSizeVal = self.yStepSize.get()
+        ser.write(f'xMove {self.yStepSizeVal}\n'.encode('utf-8'))
     
     def yLeft(self, args=0):
         global ser
@@ -226,6 +259,12 @@ class GUI(ctk.CTk):
             return
         self.zStepSizeVal = self.zStepSize.get()
         ser.write(f'zMove {self.zStepSizeVal}\n'.encode('utf-8'))
+    
+    def zWeld(self, args=0):
+        global ser
+        if not ser.is_open or not self.zUpButton.cget('state') == tk.NORMAL:
+            return
+        ser.write(b'zStepCycle\n')
 
     def refreshConnections(self):
         self.connectTarget.configure(values = [port.name for port in serial.tools.list_ports.comports()])
