@@ -17,11 +17,17 @@ const int zHomePin = A2;
 
 #define WELD_TIME 200
 
+enum PackType {
+  PT_A,
+  PT_B
+};
+
 bool stopped = false;
+PackType packType = PT_A;
 unsigned long lastPrint = 0;
 
 HorizontalAxis x(xEnablePin, xDirPin, xStepPin, false);
-HorizontalAxis y(yEnablePin, yDirPin, yStepPin, true);
+HorizontalAxis y(yEnablePin, yDirPin, yStepPin, true, 2.0f);
 ZAxis z(zEnablePin, zDirPin, zStepPin, true);
 
 void eStop() {
@@ -39,11 +45,11 @@ void setup() {
   x.setMaxSpeed(1000);
   x.setAcceleration(5000);
   pinMode(xHomePin, INPUT_PULLUP);
-  // x.attachHome(xHomePin);
-  x.setStepover(1016 / sqrt(2)); // 1016 = 1/sqrt(2) in
+  x.attachHome(xHomePin);
+  x.setStepover(25*25.4/2*sqrt(3)); // 1016 = 1/sqrt(2) in
 
   // Configure Y Axis Settings
-  y.setMaxSpeed(1000);
+  y.setMaxSpeed(2000);
   y.setAcceleration(5000);
   pinMode(yHomePin, INPUT_PULLUP);
   y.attachHome(yHomePin);
@@ -54,10 +60,10 @@ void setup() {
   z.setAcceleration(5000);
   pinMode(zHomePin, INPUT_PULLUP);
   z.attachHome(zHomePin);
-  z.setStepdown(125); // 125 = 5mm
+  z.setStepdown(200); // 200 = 6.25mm
 
   pinMode(eStopPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(eStopPin), eStop, FALLING);
+  attachInterrupt(digitalPinToInterrupt(eStopPin), eStop, RISING);
   delay(10);
   x.resetEStop();
   y.resetEStop();
@@ -65,16 +71,21 @@ void setup() {
 }
 
 // Run the script to weld a series of 24 cells
-void runSeries(int passes = 1) {
+// Returns true if success, false if stopped early
+bool runSeries(int passes = 1, int row = 0, int cells = 24, bool manual = false) {
   stopped = false;
   for (int i = 0; i < passes && !stopped; i++) {
     Serial.print("R");
+    Serial.print(row); // Row count
+    Serial.print(" ");
     Serial.print(i); // Pass count
     Serial.print(" ");
     Serial.println(0); // Cell count
     z.stepdownCycle(WELD_TIME);
-    for (int j = 0; j < 23 && !stopped; j++) {
+    for (int j = 0; j < cells - 1 && !stopped; j++) {
       Serial.print("R");
+      Serial.print(row); // Row count
+      Serial.print(" ");
       Serial.print(i); // Pass count
       Serial.print(" ");
       Serial.println(j + 1); // Cell count
@@ -82,9 +93,10 @@ void runSeries(int passes = 1) {
       delay(100);
       z.stepdownCycle(WELD_TIME);
       delay(100);
-      while (Serial.available()) {
+      while (Serial.available() || manual) {
         String cmd = Serial.readString();
         cmd.trim();
+        Serial.println("# " + cmd);
         if (cmd == "stop") {
           stopped = true;
           break;
@@ -101,30 +113,33 @@ void runSeries(int passes = 1) {
             break;
           }
         }
+        if (manual && cmd == "next")
+          break;
+        delay(20);
       }
     }
     if (stopped)
       break;
-    y.stepoverBlockingCustom(80);
-    y.stepoverBlockingCustom(y.getStepover() * 23, true);
+    y.stepoverBlockingCustom(80, false);
+    y.stepoverBlockingCustom(y.getStepover() * (cells - 1), true);
     delay(1000);
   }
-  Serial.println("finished");
+  return !stopped;
 }
 
 // Run a full pack of 16 serieses
 void runPack(int passes = 1, bool startClose = false) {
   bool close = startClose;
   for (int i = 0; i < 16; i++) {
-    runSeries(passes);
-    if (close)
-      y.stepoverHalfBlocking();
-    else
-      y.stepoverHalfBlocking(true);
+    if (!runSeries(passes, i, 4, false))
+      return;
+    y.stepoverBlockingCustom(80*passes, true);
+    y.stepoverHalfBlocking(!close);
     close = !close;
     x.stepoverBlocking();
     delay(3000);
   }
+  Serial.println("finished");
 }
 
 // Run the script to weld a series of N 18650 cells
@@ -176,6 +191,7 @@ void runSeries18650(int cells, int passes = 1) {
     while (Serial.available()) {
       String cmd = Serial.readString();
       cmd.trim();
+      Serial.println(cmd);
       if (cmd == "stop") {
         stopped = true;
         break;
@@ -197,9 +213,30 @@ void runSeries18650(int cells, int passes = 1) {
   Serial.println("finished");
 }
 
+// Align the welder to the first cell
+void align(PackType packType) {
+  z.moveTo(0);
+  while (z.isRunning()) {
+    z.run();
+  }
+  if (packType == PT_A) {
+    x.moveTo(620);
+    y.moveTo(1940);
+  }
+  else if (packType == PT_B) {
+    x.moveTo(620);
+    y.moveTo(1940 + (y.getStepover()/2));
+  }
+  while (x.isRunning() || y.isRunning()) {
+    x.run();
+    y.run();
+  }
+  z.moveTo(825);
+}
+
 void parseCommand(String cmd, String cmd2 = "") {
+  Serial.println("# " + cmd + " " + cmd2);
   if (cmd == "runSeries") {
-    Serial.println("# runSeries");
     runSeries(2);
   }
   else if (cmd == "runSeries18650") {
@@ -207,8 +244,18 @@ void parseCommand(String cmd, String cmd2 = "") {
     runSeries18650(cells, 2);
   }
   else if (cmd == "runPack") {
-    Serial.println("# runPack");
-    runPack(2);
+    runPack(2, !packType);
+  }
+  else if (cmd == "packType") {
+    if (cmd2 == "A")
+      packType = PT_A;
+    else if (cmd2 == "B")
+      packType = PT_B;
+    else
+      Serial.println("# Unknown pack type " + cmd2);
+  }
+  else if (cmd == "align") {
+    align(packType);
   }
   else if (cmd == "xSetStepSize") {
     float stepover = cmd2.toFloat();
@@ -244,18 +291,18 @@ void parseCommand(String cmd, String cmd2 = "") {
     z.stepdownCycle(300);
   }
   else if (cmd == "xHome") {
-    x.home();
+    x.home(500);
   }
   else if (cmd == "yHome") {
-    y.home();
+    y.home(750);
   }
   else if (cmd == "zHome") {
-    z.home();
+    z.home(500);
   }
   else if (cmd == "homeAll") {
+    z.home();
     x.home();
     y.home();
-    z.home();
   }
   else if (cmd == "xMove") {
     float distance = cmd2.toFloat();
@@ -376,7 +423,7 @@ void parseCommand(String cmd, String cmd2 = "") {
     Serial.println("pong");
   }
   else {
-    Serial.println("Unknown command " + cmd + ".");
+    Serial.println("# Unknown command " + cmd + ".");
   }
 }
 

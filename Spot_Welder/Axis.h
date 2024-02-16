@@ -7,7 +7,7 @@
 class Axis {
 public:
   // Constructor takes in EN, DIR, and STEP pins, as well as whether the stepper is inverted
-  Axis(int EN, int DIR, int STEP, bool invertedIn = false): stepper(AccelStepper::DRIVER, STEP, DIR), mHomePin(-1), inverted(invertedIn), ESTOPPED(false) {
+  Axis(int EN, int DIR, int STEP, bool invertedIn = false, float multiplier = 1.0f): stepper(AccelStepper::DRIVER, STEP, DIR), mHomePin(-1), inverted(invertedIn), ESTOPPED(false), mMultiplier(multiplier) {
     stepper.setEnablePin(EN);
   };
 
@@ -38,12 +38,12 @@ public:
 
   // Move by a given amount
   void move(float distance) {
-    stepper.move(inverted ? -distance : distance);
+    stepper.move((inverted ? -distance : distance) * mMultiplier);
   }
 
   // Set to exact position
   void moveTo(float position) {
-    stepper.moveTo(inverted ? -position : position);
+    stepper.moveTo((inverted ? -position : position) * mMultiplier);
   }
 
   // Stop the stepper as soon as acceleration allows
@@ -58,17 +58,17 @@ public:
 
   // Get the current position of the stepper
   float getPosition() {
-    return inverted ? -stepper.currentPosition() : stepper.currentPosition();
+    return (inverted ? -stepper.currentPosition() : stepper.currentPosition()) * mMultiplier;
   }
 
   // Get the target position of the stepper
   float getTargetPosition() {
-    return inverted ? -stepper.targetPosition() : stepper.targetPosition();
+    return (inverted ? -stepper.targetPosition() : stepper.targetPosition()) * mMultiplier;
   }
 
   // Get the distance to go
   float getDistanceToGo() {
-    return inverted ? -stepper.distanceToGo() : stepper.distanceToGo();
+    return (inverted ? -stepper.distanceToGo() : stepper.distanceToGo()) * mMultiplier;
   }
 
   // Run the stepper according to active program. Will not process past home.
@@ -98,7 +98,7 @@ public:
     Serial.println(ESTOPPED);
     while (digitalRead(mHomePin) == HIGH && !ESTOPPED) {
       stepper.runSpeed();
-      delay(5);
+      // delay(5);
     }
     Serial.println(ESTOPPED);
     stepper.stop();
@@ -129,6 +129,7 @@ protected:
   bool inverted;
   bool ESTOPPED;
   int mHomePin;
+  float mMultiplier;
 };
 
 
@@ -136,7 +137,7 @@ protected:
 class HorizontalAxis : public Axis {
 public:
   // Constructor
-  HorizontalAxis(int EN, int DIR, int STEP, bool invertedIn = false): Axis(EN, DIR, STEP, invertedIn) {}
+  HorizontalAxis(int EN, int DIR, int STEP, bool invertedIn = false, float multiplier = 1.0f): Axis(EN, DIR, STEP, invertedIn, multiplier) {}
 
   // Set the stepover distance
   void setStepover(float stepover) {
@@ -150,17 +151,17 @@ public:
 
   // Stepover by the set distance
   void stepover(bool backwards = false) {
-    stepper.move((inverted ^ backwards) ? -mStepover : mStepover);
+    move((backwards) ? -mStepover : mStepover);
   }
 
   // Stepover by half the set distance
   void stepoverHalf(bool backwards = false) {
-    stepper.move((inverted ^ backwards) ? -mStepover / 2 : mStepover / 2);
+    move((backwards) ? -mStepover / 2 : mStepover / 2);
   }
 
   // Stepover by a custom distance
   void stepoverCustom(float stepSize, bool backwards = false) {
-    stepper.move((inverted ^ backwards) ? -stepSize : stepSize);
+    move((backwards) ? -stepSize : stepSize);
   }
 
   // Run a stepover, pausing other operations
@@ -200,7 +201,7 @@ class ZAxis : public Axis {
 public:
   // Constructor
   // Note: defaults to inverted
-  ZAxis(int EN, int DIR, int STEP, bool invertedIn = false): Axis(EN, DIR, STEP, invertedIn) {}
+  ZAxis(int EN, int DIR, int STEP, bool invertedIn = false, float multiplier = 1.0f): Axis(EN, DIR, STEP, invertedIn, multiplier) {}
   
   // Set the stepdown distance
   void setStepdown(float stepSize) {
@@ -214,22 +215,22 @@ public:
 
   // Stepdown by the set distance
   void stepdown() {
-    stepper.move(inverted ? -mStepdown : mStepdown);
+    move(mStepdown);
   }
 
   // Stepdown by a custom distance
   void stepdownCustom(float stepSize) {
-    stepper.move(inverted ? -stepSize : stepSize);
+    move(stepSize);
   }
 
   // Stepup by the set distance
   void stepup() {
-    stepper.move(inverted ? mStepdown : -mStepdown);
+    move(-mStepdown);
   }
 
   // Stepup by a custom distance
   void stepupCustom(float stepSize) {
-    stepper.move(inverted ? stepSize : -stepSize);
+    move(-stepSize);
   }
 
   // Run a stepdown cycle, pausing other operations
