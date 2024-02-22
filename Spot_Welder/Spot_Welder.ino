@@ -46,7 +46,7 @@ void setup() {
   x.setAcceleration(5000);
   pinMode(xHomePin, INPUT_PULLUP);
   x.attachHome(xHomePin);
-  x.setStepover(25*25.4/2*sqrt(3)); // 1016 = 1/sqrt(2) in
+  x.setStepover(25*25.4/2*sqrt(3)); // 550 = sqrt(3)/2 in
 
   // Configure Y Axis Settings
   y.setMaxSpeed(2000);
