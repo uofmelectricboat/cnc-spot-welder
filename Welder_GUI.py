@@ -162,26 +162,37 @@ class GUI(ctk.CTk):
         self.packTypeSelectB = ctk.CTkRadioButton(self.arrangementFrame, text="B", variable=self.packType, value="B", command=self.selectPackType, state=tk.DISABLED)
         self.packTypeSelectB.grid(column=1, row=1, padx=10, pady=10)
 
-        self.progressFrame = ctk.CTkFrame(self.runningWindow, fg_color="#08003A")
-        # self.progressFrame.pack(side=tk.BOTTOM, fill=tk.X, padx=30, pady=10)
+        self.expanderFrame = ctk.CTkFrame(self.runningWindow, fg_color="#08003A")
+        self.expanderFrame.pack(side=tk.BOTTOM, fill=tk.X, padx=30, pady=10)
 
-        self.progressText = ctk.CTkLabel(self.progressFrame, text="Progress:")
-        self.progressRowLabel = ctk.CTkLabel(self.progressFrame, text="Current Row:")
-        self.progressRow = ctk.CTkLabel(self.progressFrame, text="0")
-        self.progressPassLabel = ctk.CTkLabel(self.progressFrame, text="Current Pass:")
-        self.progressPass = ctk.CTkLabel(self.progressFrame, text="0")
-        self.progressCellLabel = ctk.CTkLabel(self.progressFrame, text="Current Cell:")
-        self.progressCell = ctk.CTkLabel(self.progressFrame, text="0")
-        self.vertSpacer = ctk.CTkFrame(self.progressFrame, fg_color="#08003A", width=10, height=50)
+        # self.progressFrame = ctk.CTkFrame(self.runningWindow, fg_color="#08003A")
 
-        self.progressText.grid(column=0, row=0, columnspan=2, padx=2, pady=2)
-        self.progressRowLabel.grid(column=0, row=1, padx=2, pady=2)
-        self.progressRow.grid(column=1, row=1, padx=2, pady=2)
-        self.vertSpacer.grid(column=2, row=0, rowspan=3, padx=2, pady=2)
-        self.progressPassLabel.grid(column=3, row=0, padx=2, pady=2)
-        self.progressPass.grid(column=4, row=0, padx=2, pady=2)
-        self.progressCellLabel.grid(column=3, row=1, padx=2, pady=2)
-        self.progressCell.grid(column=4, row=1, padx=2, pady=2)
+        # self.progressText = ctk.CTkLabel(self.progressFrame, text="Progress:")
+        # self.progressRowLabel = ctk.CTkLabel(self.progressFrame, text="Current Row:")
+        # self.progressRow = ctk.CTkLabel(self.progressFrame, text="0")
+        # self.progressPassLabel = ctk.CTkLabel(self.progressFrame, text="Current Pass:")
+        # self.progressPass = ctk.CTkLabel(self.progressFrame, text="0")
+        # self.progressCellLabel = ctk.CTkLabel(self.progressFrame, text="Current Cell:")
+        # self.progressCell = ctk.CTkLabel(self.progressFrame, text="0")
+        # self.vertSpacer = ctk.CTkFrame(self.progressFrame, fg_color="#08003A", width=10, height=50)
+
+        # self.progressText.grid(column=0, row=0, columnspan=2, padx=2, pady=2)
+        # self.progressRowLabel.grid(column=0, row=1, padx=2, pady=2)
+        # self.progressRow.grid(column=1, row=1, padx=2, pady=2)
+        # self.vertSpacer.grid(column=2, row=0, rowspan=3, padx=2, pady=2)
+        # self.progressPassLabel.grid(column=3, row=0, padx=2, pady=2)
+        # self.progressPass.grid(column=4, row=0, padx=2, pady=2)
+        # self.progressCellLabel.grid(column=3, row=1, padx=2, pady=2)
+        # self.progressCell.grid(column=4, row=1, padx=2, pady=2)
+
+        self.expandButton = ctk.CTkButton(self.expanderFrame, text="Expand", corner_radius=999, command=self.expand, width=80, height=35)
+        self.expandButton.pack(side=tk.TOP, padx=10, pady=10)
+
+        self.green_r_semi = ctk.CTkImage(Image.open("assets/green-r-semi.png"), size=(10, 20))
+        self.red_r_semi = ctk.CTkImage(Image.open("assets/red-r-semi.png"), size=(10, 20))
+        self.green_l_semi = ctk.CTkImage(Image.open("assets/green-l-semi.png"), size=(10, 20))
+        self.red_l_semi = ctk.CTkImage(Image.open("assets/red-l-semi.png"), size=(10, 20))
+        self.cellStates = [[[0, 0] for i in range(24)] for j in range(16)]
 
 
         ########################################################################
@@ -220,6 +231,7 @@ class GUI(ctk.CTk):
         self.homeAllButton.configure(state=tk.NORMAL)
         self.packTypeSelectA.configure(state=tk.NORMAL)
         self.packTypeSelectB.configure(state=tk.NORMAL)
+        self.controlAllowed = True
 
     def disableControl(self):
         self.controlFrame.pack_forget()
@@ -233,6 +245,7 @@ class GUI(ctk.CTk):
         self.homeAllButton.configure(state=tk.DISABLED)
         self.packTypeSelectA.configure(state=tk.DISABLED)
         self.packTypeSelectB.configure(state=tk.DISABLED)
+        self.controlAllowed = False
 
     def xForwards(self, args=0):
         global ser
@@ -317,6 +330,37 @@ class GUI(ctk.CTk):
         if not ser.is_open or not self.zUpButton.cget('state') == tk.NORMAL:
             return
         ser.write(b'zStepCycle\n')
+    
+    def zWeldExpanded(self, args=0):
+        global ser
+        if not ser.is_open or not self.zUpButton.cget('state') == tk.NORMAL:
+            return
+        ser.write(f'zWeld {self.selectedRow}_{self.selectedCol}_{self.selectedSide}\n'.encode('utf-8'))
+    
+    def setWelded(self, row, col, side):
+        self.cellStates[row][col][side] = 1
+        try:
+            if (self.packViewer.winfo_ismapped()):
+                if (side == 0):
+                    self.packButtons[row][col][side].configure(image=self.red_l_semi)
+                else:
+                    self.packButtons[row][col][side].configure(image=self.red_r_semi)
+        except:
+            pass
+        
+    def resetWelds(self):
+        global ser
+        if not ser.is_open:
+            return
+        ser.write(b'resetWelds\n')
+        for i in range(16):
+            for j in range(24):
+                for k in range(2):
+                    self.cellStates[i][j][k] = 0
+                    if (k == 0):
+                        self.packButtons[i][j][k].configure(image=self.green_l_semi)
+                    else:
+                        self.packButtons[i][j][k].configure(image=self.green_r_semi)
 
     def xSetStep(self):
         global ser
@@ -420,13 +464,61 @@ class GUI(ctk.CTk):
             return
         ser.write(b'homeAll\n')
 
+    def cellSelect(self, row, col, side):
+        global finished
+        global ser
+        if not finished:
+            return
+        if not self.controlAllowed:
+            return
+        ser.write(f"moveToCell {row}_{col}_{side}".encode('utf-8'))
+        self.selectedRow = row
+        self.selectedCol = col
+        self.selectedSide = side
+
+    def cellButtons(self, row, col):
+        cellButtonsLocal = [ctk.CTkButton(self.packViewerMain, image=self.green_l_semi, text="", command=lambda: self.cellSelect(row, col, 0), corner_radius=0, width=10, height=20, fg_color="#08003A"),
+                            ctk.CTkButton(self.packViewerMain, image=self.green_r_semi, text="", command=lambda: self.cellSelect(row, col, 1), corner_radius=0, width=10, height=20, fg_color="#08003A")]
+        if (self.cellStates[row][col][0] == 1):
+            cellButtonsLocal[0].configure(image=self.red_l_semi)
+        if (self.cellStates[row][col][1] == 1):
+            cellButtonsLocal[1].configure(image=self.red_r_semi)
+        return cellButtonsLocal
+    
+    def expand(self):
+        self.packViewer = ctk.CTkToplevel(self.root, fg_color="#08003A")
+        self.packViewer.title("Pack Viewer")
+        self.packViewer.geometry("800x575")
+        self.packViewer.bind("<space>", self.zWeldExpanded)
+
+        self.packViewerMain = ctk.CTkFrame(self.packViewer, fg_color="#08003A")
+        self.packViewerMain.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        self.selectedRow = 0
+        self.selectedCol = 0
+        self.selectedSide = 0
+        
+        # Pack viewer
+        self.packButtons = [[self.cellButtons(j, i) for i in range(24)] for j in range(16)]
+        for i in range(16):
+            for j in range(24):
+                colOffset = ((i + 1) % 2) + (i % 2) * (2 * (self.packType.get() == "A"))
+                self.packButtons[i][j][0].grid(column=j*2 + colOffset, row=i, pady=2)
+                self.packButtons[i][j][1].grid(column=j*2 + colOffset + 1, row=i, pady=2)
+        
+        self.packViewFooter = ctk.CTkFrame(self.packViewer, fg_color="#08003A")
+        self.packViewFooter.pack(side=tk.BOTTOM, fill=tk.X, expand=True, padx=10, pady=10)
+
+        self.reset = ctk.CTkButton(self.packViewFooter, text="Reset", command=self.resetWelds, corner_radius=999, width=50, height=25)
+        self.reset.pack(side=tk.TOP, padx=10, pady=10)
+
     def start(self):
         global finished
         global paused
         global ser
         if not tk.messagebox.askokcancel("Start Welding", "Are you sure you want to start welding?"):
             return
-        if not tk.messagebox.askyesno("Check Alignment", "Have you aligned the setup?"):
+        if not tk.messagebox.askyesno("Check Alignment", "Have you checked alignment?"):
             return
         if not tk.messagebox.askyesno("Check Pack Type", "Have you selected the correct pack type?"):
             return
@@ -436,7 +528,7 @@ class GUI(ctk.CTk):
         self.stopButton.configure(state=tk.NORMAL)
         self.pauseButton.configure(state=tk.NORMAL)
         self.startButton.configure(state=tk.DISABLED)
-        self.progressFrame.pack(side=tk.BOTTOM, fill=tk.X, padx=30, pady=10)
+        # self.progressFrame.pack(side=tk.BOTTOM, fill=tk.X, padx=30, pady=10)
         self.disableControl()
         ser.write(b'runPack\n')
     
@@ -458,7 +550,7 @@ class GUI(ctk.CTk):
         self.stopButton.configure(state=tk.DISABLED)
         self.pauseButton.configure(state=tk.DISABLED)
         self.startButton.configure(state=tk.NORMAL)
-        self.progressFrame.pack_forget()
+        # self.progressFrame.pack_forget()
         self.enableControl()
         ser.write(b'stop\n')
 
@@ -493,7 +585,7 @@ class GUI(ctk.CTk):
         self.stopButton.configure(state=tk.DISABLED)
         self.pauseButton.configure(state=tk.DISABLED)
         self.startButton.configure(state=tk.NORMAL)
-        self.progressFrame.pack_forget()
+        # self.progressFrame.pack_forget()
     
 root = ctk.CTk()
 app = GUI(root)
@@ -537,9 +629,10 @@ def checkFinish():
                         state = line[1:].split(' ')
                     except:
                         continue
-                    app.progressRow.configure(text=state[0])
-                    app.progressPass.configure(text=state[1])
-                    app.progressCell.configure(text=state[2])
+                    # app.progressRow.configure(text=state[0])
+                    # app.progressPass.configure(text=state[1])
+                    # app.progressCell.configure(text=state[2])
+                    app.setWelded(int(state[0]), int(state[2]), int(state[1]))
                 elif (line == 'paused'):
                     app.statusCurrent.configure(text="Paused", text_color="orange")
                 elif (line == 'ESTOP'):

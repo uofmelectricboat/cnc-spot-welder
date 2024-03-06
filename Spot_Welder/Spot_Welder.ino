@@ -30,6 +30,19 @@ HorizontalAxis x(xEnablePin, xDirPin, xStepPin, false);
 HorizontalAxis y(yEnablePin, yDirPin, yStepPin, true, 2.0f);
 ZAxis z(zEnablePin, zDirPin, zStepPin, true);
 
+const int X_ZERO = 620;
+const int Y_ZERO = 1940;
+const int Z_ZERO = 825;
+const float X_STEPOVER = 25*25.4/2*sqrt(3);
+const float Y_STEPOVER = 1016;
+const float Z_STEPDOWN = 200;
+const float WELD_SPACE = 1016.0 * 0.08;
+
+int row = 0, cell = 0, side = 0;
+uint8_t welded[16][24] = {0};
+
+void moveToCell(int mRow, int mCell, int mSide, PackType packType, bool retract = true);
+
 void eStop() {
   x.eStop();
   y.eStop();
@@ -46,21 +59,21 @@ void setup() {
   x.setAcceleration(5000);
   pinMode(xHomePin, INPUT_PULLUP);
   x.attachHome(xHomePin);
-  x.setStepover(25*25.4/2*sqrt(3)); // 550 = sqrt(3)/2 in
+  x.setStepover(X_STEPOVER); // 550 = sqrt(3)/2 in
 
   // Configure Y Axis Settings
   y.setMaxSpeed(2000);
   y.setAcceleration(5000);
   pinMode(yHomePin, INPUT_PULLUP);
   y.attachHome(yHomePin);
-  y.setStepover(1016); // 1016 = 1 in
+  y.setStepover(Y_STEPOVER); // 1016 = 1 in
 
   // Configure Z Axis Settings
   z.setMaxSpeed(1000);
   z.setAcceleration(5000);
   pinMode(zHomePin, INPUT_PULLUP);
   z.attachHome(zHomePin);
-  z.setStepdown(200); // 200 = 6.25mm
+  z.setStepdown(Z_STEPDOWN); // 200 = 6.25mm
 
   pinMode(eStopPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(eStopPin), eStop, RISING);
@@ -70,28 +83,31 @@ void setup() {
   z.resetEStop();
 }
 
+// Weld the current cell
+void zWeld() {
+  Serial.print("R");
+  Serial.print(row); // Row count
+  Serial.print(" ");
+  Serial.print(side); // Pass count
+  Serial.print(" ");
+  Serial.println(cell); // Cell count
+  z.stepdownCycle(WELD_TIME);
+  welded[row][cell] |= (1 << side);
+}
+
 // Run the script to weld a series of 24 cells
 // Returns true if success, false if stopped early
-bool runSeries(int passes = 1, int row = 0, int cells = 24, bool manual = false) {
+bool runSeries(int passes = 2, int cells = 24, bool manual = false) {
   stopped = false;
   for (int i = 0; i < passes && !stopped; i++) {
-    Serial.print("R");
-    Serial.print(row); // Row count
-    Serial.print(" ");
-    Serial.print(i); // Pass count
-    Serial.print(" ");
-    Serial.println(0); // Cell count
-    z.stepdownCycle(WELD_TIME);
-    for (int j = 0; j < cells - 1 && !stopped; j++) {
-      Serial.print("R");
-      Serial.print(row); // Row count
-      Serial.print(" ");
-      Serial.print(i); // Pass count
-      Serial.print(" ");
-      Serial.println(j + 1); // Cell count
-      y.stepoverBlocking();
+    side = i;
+    for (int j = 0; j < cells && !stopped; j++) {
+      cell = j;
+      if (welded[row][cell] & (1 << side))
+        continue;
+      moveToCell(row, cell, side, packType, false);
       delay(100);
-      z.stepdownCycle(WELD_TIME);
+      zWeld();
       delay(100);
       while (Serial.available() || manual) {
         String cmd = Serial.readString();
@@ -128,10 +144,11 @@ bool runSeries(int passes = 1, int row = 0, int cells = 24, bool manual = false)
 }
 
 // Run a full pack of 16 serieses
-void runPack(int passes = 1, bool startClose = false) {
-  bool close = startClose;
+void runPack(int passes = 2, PackType packType = PT_A, int seriesCells = 24) {
+  bool close = !packType;
   for (int i = 0; i < 16; i++) {
-    if (!runSeries(passes, i, 4, false))
+    row = i;
+    if (!runSeries(passes, seriesCells, false))
       return;
     y.stepoverBlockingCustom(80*passes, true);
     y.stepoverHalfBlocking(!close);
@@ -220,18 +237,50 @@ void align(PackType packType) {
     z.run();
   }
   if (packType == PT_A) {
-    x.moveTo(620);
-    y.moveTo(1940);
+    x.moveTo(X_ZERO);
+    y.moveTo(Y_ZERO);
   }
   else if (packType == PT_B) {
-    x.moveTo(620);
-    y.moveTo(1940 + (y.getStepover()/2));
+    x.moveTo(X_ZERO);
+    y.moveTo(Y_ZERO + (y.getStepover()/2));
   }
   while (x.isRunning() || y.isRunning()) {
     x.run();
     y.run();
   }
-  z.moveTo(825);
+  z.moveTo(Z_ZERO);
+  while (z.isRunning()) {
+    z.run();
+  }
+}
+
+// Move the welder to a specific cell
+void moveToCell(int mRow, int mCell, int mSide, PackType packType, bool retract = true) {
+  row = mRow;
+  cell = mCell;
+  side = mSide;
+  if (retract) {
+    z.moveTo(0);
+    while (z.isRunning()) {
+      z.run();
+    }
+  }
+  if (packType == PT_A) {
+    x.moveTo(X_ZERO + mRow * X_STEPOVER);
+    y.moveTo(Y_ZERO + ((mRow + 1) % 2) * Y_STEPOVER / 2 + mCell * Y_STEPOVER + (mSide ? (WELD_SPACE / 2) : (-WELD_SPACE / 2)));
+  }
+  else if (packType == PT_B) {
+    x.moveTo(X_ZERO + mRow * X_STEPOVER);
+    y.moveTo(Y_ZERO + (mRow % 2) * Y_STEPOVER / 2 + mCell * Y_STEPOVER + (mSide ? (WELD_SPACE / 2) : (-WELD_SPACE / 2)));
+  }
+  while (x.isRunning() || y.isRunning()) {
+    x.run();
+    y.run();
+  }
+  z.moveTo(Z_ZERO);
+  while (z.isRunning()) {
+    z.run();
+  }
 }
 
 void parseCommand(String cmd, String cmd2 = "") {
@@ -244,7 +293,7 @@ void parseCommand(String cmd, String cmd2 = "") {
     runSeries18650(cells, 2);
   }
   else if (cmd == "runPack") {
-    runPack(2, !packType);
+    runPack(2, packType);
   }
   else if (cmd == "packType") {
     if (cmd2 == "A")
@@ -288,13 +337,23 @@ void parseCommand(String cmd, String cmd2 = "") {
     z.stepup();
   }
   else if (cmd == "zStepCycle") {
-    z.stepdownCycle(300);
+    z.stepdownCycle(WELD_TIME);
+  }
+  else if (cmd == "zWeld") {
+    zWeld();
+  }
+  else if (cmd == "resetWelds") {
+    for (int i = 0; i < 16; i++) {
+      for (int j = 0; j < 24; j++) {
+        welded[i][j] = 0;
+      }
+    }
   }
   else if (cmd == "xHome") {
     x.home(500);
   }
   else if (cmd == "yHome") {
-    y.home(750);
+    y.home(900);
   }
   else if (cmd == "zHome") {
     z.home(500);
@@ -365,6 +424,14 @@ void parseCommand(String cmd, String cmd2 = "") {
     x.eStop();
     y.eStop();
     z.eStop();
+  }
+  else if (cmd == "moveToCell") {
+    String row = cmd2.substring(0, cmd2.indexOf("_"));
+    String cell = cmd2.substring(cmd2.indexOf("_") + 1);
+    String side = cell.substring(cell.indexOf("_") + 1);
+    cell = cell.substring(0, cell.indexOf("_"));
+    Serial.println("# " + row + " " + cell + " " + side);
+    moveToCell(row.toInt(), cell.toInt(), side.toInt(), packType);
   }
   else if (cmd == "resetEStop") {
     x.resetEStop();
