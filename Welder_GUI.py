@@ -77,8 +77,8 @@ class GUI(ctk.CTk):
         self.xStepSize.grid(column=1, row=3, pady=10, padx=2)
         self.xSetStepSize = ctk.CTkButton(self.controlFrame, text="Set Step", command=self.xSetStep, corner_radius=999, width=50, height=25)
         self.xSetStepSize.grid(column=1, row=4, pady=10, padx=2)
-        self.root.bind("a", self.xForwards)
-        self.root.bind("d", self.xBackwards)
+        self.root.bind("a", self.xBackwards)
+        self.root.bind("d", self.xForwards)
         
         self.placeholder0 = ctk.CTkFrame(self.controlFrame, fg_color="#08003A", width=10, height=50)
         self.placeholder0.grid(column=2, row=0, rowspan=3, padx=2, pady=2)
@@ -92,8 +92,8 @@ class GUI(ctk.CTk):
         self.yStepSize.grid(column=3, columnspan=2, row=3, pady=10, padx=2)
         self.ySetStepSize = ctk.CTkButton(self.controlFrame, text="Set Step", command=self.ySetStep, corner_radius=999, width=50, height=25)
         self.ySetStepSize.grid(column=3, columnspan=2, row=4, pady=10, padx=2)
-        self.root.bind("s", self.yLeft)
-        self.root.bind("w", self.yRight)
+        self.root.bind("s", self.yRight)
+        self.root.bind("w", self.yLeft)
 
         self.placeholder1 = ctk.CTkFrame(self.controlFrame, fg_color="#08003A", width=10, height=50)
         self.placeholder1.grid(column=5, row=0, rowspan=3, padx=2, pady=2)

@@ -15,7 +15,7 @@ const int xHomePin = A0;
 const int yHomePin = A1;
 const int zHomePin = A2;
 
-#define WELD_TIME 200
+#define WELD_TIME 800
 
 enum PackType {
   PT_A,
@@ -30,13 +30,13 @@ HorizontalAxis x(xEnablePin, xDirPin, xStepPin, false);
 HorizontalAxis y(yEnablePin, yDirPin, yStepPin, true, 2.0f);
 ZAxis z(zEnablePin, zDirPin, zStepPin, true);
 
-const int X_ZERO = 620;
-const int Y_ZERO = 1940;
-const int Z_ZERO = 825;
+const int X_ZERO = 590;
+const int Y_ZERO = 1150;
+const int Z_ZERO = 700;
 const float X_STEPOVER = 25*25.4/2*sqrt(3);
 const float Y_STEPOVER = 1016;
-const float Z_STEPDOWN = 200;
-const float WELD_SPACE = 1016.0 * 0.08;
+const float Z_STEPDOWN = 400;
+const float WELD_SPACE = 1016.0 * 0.12;
 
 int row = 0, cell = 0, side = 0;
 uint8_t welded[16][24] = {0};
@@ -44,6 +44,9 @@ uint8_t welded[16][24] = {0};
 void moveToCell(int mRow, int mCell, int mSide, PackType packType, bool retract = true);
 
 void eStop() {
+  delay(20);
+  if (digitalRead(eStopPin) == LOW)
+    return;
   x.eStop();
   y.eStop();
   z.eStop();
@@ -70,7 +73,7 @@ void setup() {
 
   // Configure Z Axis Settings
   z.setMaxSpeed(1000);
-  z.setAcceleration(5000);
+  z.setAcceleration(3000);
   pinMode(zHomePin, INPUT_PULLUP);
   z.attachHome(zHomePin);
   z.setStepdown(Z_STEPDOWN); // 200 = 6.25mm
@@ -102,7 +105,7 @@ bool runSeries(int passes = 2, int cells = 24, bool manual = false) {
   for (int i = 0; i < passes && !stopped; i++) {
     side = i;
     for (int j = 0; j < cells && !stopped; j++) {
-      cell = j;
+      cell = (i % 2 == 1) ? (cells - j - 1) : j; // Go back and forth
       if (welded[row][cell] & (1 << side))
         continue;
       moveToCell(row, cell, side, packType, false);
@@ -136,8 +139,8 @@ bool runSeries(int passes = 2, int cells = 24, bool manual = false) {
     }
     if (stopped)
       break;
-    y.stepoverBlockingCustom(80, false);
-    y.stepoverBlockingCustom(y.getStepover() * (cells - 1), true);
+    // y.stepoverBlockingCustom(80, false);
+    // y.stepoverBlockingCustom(y.getStepover() * (cells - 1), true);
     delay(1000);
   }
   return !stopped;
@@ -267,11 +270,11 @@ void moveToCell(int mRow, int mCell, int mSide, PackType packType, bool retract 
   }
   if (packType == PT_A) {
     x.moveTo(X_ZERO + mRow * X_STEPOVER);
-    y.moveTo(Y_ZERO + ((mRow + 1) % 2) * Y_STEPOVER / 2 + mCell * Y_STEPOVER + (mSide ? (WELD_SPACE / 2) : (-WELD_SPACE / 2)));
+    y.moveTo(Y_ZERO + (mRow % 2) * Y_STEPOVER / 2 + mCell * Y_STEPOVER + (mSide ? (WELD_SPACE / 2) : (-WELD_SPACE / 2)));
   }
   else if (packType == PT_B) {
     x.moveTo(X_ZERO + mRow * X_STEPOVER);
-    y.moveTo(Y_ZERO + (mRow % 2) * Y_STEPOVER / 2 + mCell * Y_STEPOVER + (mSide ? (WELD_SPACE / 2) : (-WELD_SPACE / 2)));
+    y.moveTo(Y_ZERO + ((mRow + 1) % 2) * Y_STEPOVER / 2 + mCell * Y_STEPOVER + (mSide ? (WELD_SPACE / 2) : (-WELD_SPACE / 2)));
   }
   while (x.isRunning() || y.isRunning()) {
     x.run();
